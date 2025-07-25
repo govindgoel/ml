@@ -23,6 +23,7 @@ from gnn.models.point_net_transf_gat import PointNetTransfGAT
 from gnn.models.gcn import GCN, GCN2
 from gnn.models.gat import GAT
 from gnn.models.trans_conv import TransConv
+from gnn.models.trans_encoder import TransEncoder
 from gnn.models.pnc import PNC
 from gnn.models.fc_nn import FC_NN
 from gnn.models.eign import EIGNLaplacianConv
@@ -533,6 +534,10 @@ def create_gnn_model(gnn_arch: str, config: object, model_kwargs: dict, device: 
     
     elif gnn_arch == "xgboost":
         return XGBoostModel(**common_kwargs, **model_kwargs)
+    
+    elif gnn_arch == "trans_encoder":
+        return TransEncoder(**common_kwargs, **model_kwargs).to(device)
+
     else:
         raise ValueError(f"Unknown architecture: {gnn_arch}")
 

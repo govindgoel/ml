@@ -56,12 +56,12 @@ def main():
         print(f"An error occurred: {str(e)}")
     
     parser = argparse.ArgumentParser(description="Run GNN model training with configurable parameters.")
-    parser.add_argument("--gnn_arch", type=str, default="point_net_transf_gat",
+    parser.add_argument("--gnn_arch", type=str, default="trans_conv",
                         help="The GNN architecture to use.",
-                        choices=["point_net_transf_gat", "gat", "gcn", "gcn2", "trans_conv", "pnc", "fc_nn", "graphSAGE", "eign", "xgboost"])  # Add more as you implement them
+                        choices=["point_net_transf_gat", "gat", "gcn", "gcn2", "trans_conv", "pnc", "fc_nn", "graphSAGE", "eign", "xgboost", "trans_encoder"])  # Add more as you implement them
     parser.add_argument("--project_name", type=str, default="TR-C_Benchmarks",
                         help="The name of the project, used for saving the corresponding runs, and as the WandB project name.")
-    parser.add_argument("--unique_model_description", type=str, default="point_net_transf_gat_5_features",
+    parser.add_argument("--unique_model_description", type=str, default="trans_conv_5_features",
                         help="A unique description for the run.")
     parser.add_argument("--in_channels", type=int, default=5, help="The number of input channels.")
     parser.add_argument("--use_all_features", type=str_to_bool, default=False, help="Whether to use all features.")
