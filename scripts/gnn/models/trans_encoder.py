@@ -7,7 +7,7 @@ import wandb
 import torch
 from torch import nn
 from torch_geometric.data import Batch, Data
-from torch_geometric.nn import GCNConv, GATConv, GraphConv
+from torch_geometric.nn import GCNConv, GATConv, GraphConv, TransformerConv
 
 # Add the 'scripts' directory to Python Path
 scripts_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -111,6 +111,8 @@ class TransEncoder(BaseGNN):
                 self.graph_conv = GATConv(self.embed_dim, self.embed_dim)
             elif graph_conv_type == 'graph':
                 self.graph_conv = GraphConv(self.embed_dim, self.embed_dim)
+            elif graph_conv_type == 'transconv':
+                self.graph_conv = TransformerConv(self.embed_dim, self.embed_dim)
             else:
                 raise ValueError(f"Unknown graph_conv_type: {graph_conv_type}")
 
