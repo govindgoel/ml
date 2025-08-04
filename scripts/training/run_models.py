@@ -84,6 +84,12 @@ def main():
     parser.add_argument("--device_nr", type=int, default=0, help="The device number (0 or 1 for Retina Roaster's two GPUs).")
     parser.add_argument("--continue_training", type=str_to_bool, default=False, help="Whether to continue training from a checkpoint.")
     parser.add_argument("--base_checkpoint_path", type=str, default=None, help="Path to the checkpoint to continue training from.")
+    
+    # Model specific parameters for TransEncoder
+    parser.add_argument("--use_pos", type=str_to_bool, default=True, help="Whether to use positions.")
+    parser.add_argument("--pos_encoding", type=str_to_bool, default=False, help="Whether to use positional encoding.")
+    parser.add_argument("--use_graph_conv", type=str_to_bool, default=False, help="Whether to use graph convolution.")
+    parser.add_argument("--graph_conv_type", type=str, default='gcn', help="The type of graph convolution to use. Supported: gcn, gat, graph.")
 
     args = vars(parser.parse_args())
     set_random_seeds()
