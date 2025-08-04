@@ -7,7 +7,7 @@ import wandb
 import torch
 from torch import nn
 from torch_geometric.data import Batch, Data
-from torch_geometric.nn import GCNConv, GATConv, GraphConv, TransformerConv
+from torch_geometric.nn import GCNConv, GATConv, GraphConv, TransformerConv, GraphNorm
 
 # Add the 'scripts' directory to Python Path
 scripts_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -27,20 +27,6 @@ graph awareness, but can be enhanced with:
 1. Positional Information: Add node positions as additional features
 2. Positional Encoding: Learn embeddings for node positions (like in transformers)
 3. Graph Convolution Layers: Pre-process features using graph structure before transformer
-
-Usage Examples:
-    # Basic transformer (no graph structure)
-    python run_models.py --gnn_arch trans_encoder --unique_model_description "transformer_basic"
-    
-    # With positional features
-    python run_models.py --gnn_arch trans_encoder --use_pos True --unique_model_description "transformer_pos"
-    
-    # With learned positional encoding
-    python run_models.py --gnn_arch trans_encoder --use_pos True --pos_encoding True --unique_model_description "transformer_pos_encoding"
-    
-    # With graph convolution preprocessing
-    python run_models.py --gnn_arch trans_encoder --use_graph_conv True --graph_conv_type gcn --unique_model_description "gcn_transformer"
-    python run_models.py --gnn_arch trans_encoder --use_graph_conv True --graph_conv_type gat --unique_model_description "gat_transformer"
 """
 
 class TransEncoder(BaseGNN):
@@ -53,14 +39,16 @@ class TransEncoder(BaseGNN):
                 num_layers: int = 5,
                 num_nodes: int = 31635,
                 use_pos: bool = False,
-                pos_encoding: bool = False,
+                use_pos_encoding: bool = False,
                 dropout: float = 0.1,
-                use_dropout: bool = True,
+                use_dropout: bool = False,
+                use_graph_conv: bool = False,
+                use_graph_norm: bool = True,
+                num_graph_conv_layers: int = 2,
+                graph_conv_type: str = 'trans_conv',
                 predict_mode_stats: bool = False,
                 dtype: torch.dtype = torch.float32,
-                log_to_wandb: bool = True,
-                use_graph_conv: bool = False,
-                graph_conv_type: str = 'gcn'):
+                log_to_wandb: bool = False):
     
         # Call parent class constructor
         super().__init__(
@@ -74,14 +62,16 @@ class TransEncoder(BaseGNN):
         
         # Model specific parameters
         self.use_pos = use_pos
-        self.pos_encoding = pos_encoding
+        self.use_pos_encoding = use_pos_encoding
         self.embed_dim = embed_dim
         self.ff_dim = ff_dim
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.num_nodes = num_nodes
         self.use_graph_conv = use_graph_conv
+        self.use_graph_norm = use_graph_norm
         self.graph_conv_type = graph_conv_type
+        self.num_graph_conv_layers = num_graph_conv_layers
 
         # Give some sense of Graph structure
         if self.use_pos:
@@ -89,32 +79,21 @@ class TransEncoder(BaseGNN):
 
         if self.log_to_wandb:
             wandb.config.update({'use_pos': use_pos,
+                                'use_pos_encoding': use_pos_encoding,
                                 'in_channels': self.in_channels,
                                 'embed_dim': embed_dim,
                                 'ff_dim': ff_dim,
                                 'num_heads': num_heads,
                                 'num_layers': num_layers,
-                                'num_nodes': num_nodes},
+                                'num_nodes': num_nodes,
+                                'use_graph_conv': use_graph_conv,
+                                'use_graph_norm': use_graph_norm,
+                                'graph_conv_type': graph_conv_type,
+                                'num_graph_conv_layers': num_graph_conv_layers},
                                 allow_val_change=True)
         
         # Define the layers of the model
         self.define_layers()
-
-        if self.use_pos and self.pos_encoding:
-            assert num_nodes is not None, "num_nodes must be set for positional encoding"
-            self.pos_embedding = nn.Embedding(num_nodes, self.embed_dim)
-
-        if self.use_graph_conv:
-            if graph_conv_type == 'gcn':
-                self.graph_conv = GCNConv(self.embed_dim, self.embed_dim)
-            elif graph_conv_type == 'gat':
-                self.graph_conv = GATConv(self.embed_dim, self.embed_dim)
-            elif graph_conv_type == 'graph':
-                self.graph_conv = GraphConv(self.embed_dim, self.embed_dim)
-            elif graph_conv_type == 'transconv':
-                self.graph_conv = TransformerConv(self.embed_dim, self.embed_dim)
-            else:
-                raise ValueError(f"Unknown graph_conv_type: {graph_conv_type}")
 
     def define_layers(self):
         
@@ -134,8 +113,68 @@ class TransEncoder(BaseGNN):
         # Step 3: Project to scalar output per node
         self.output = nn.Linear(self.embed_dim, 1)
 
+        # Optional: Positional Encoding
+        if self.use_pos_encoding:
+            assert self.num_nodes is not None, "num_nodes must be set for positional encoding"
+            self.pos_embedding = nn.Embedding(self.num_nodes, self.embed_dim)
+            self.node_indices = torch.arange(self.num_nodes).long()  # Node indices for positional embedding
+
+        # Optional: Graph Convolution Layers
+        if self.use_graph_conv:
+            for i in range(self.num_graph_conv_layers):
+
+                in_channels = self.in_channels if i == 0 else self.embed_dim
+                
+                if self.graph_conv_type == 'gcn':
+                    conv = GCNConv(in_channels, self.embed_dim)
+                elif self.graph_conv_type == 'gat':
+                    conv = GATConv(in_channels, self.embed_dim)
+                elif self.graph_conv_type == 'graph':
+                    conv = GraphConv(in_channels, self.embed_dim)
+                elif self.graph_conv_type == 'trans_conv':
+                    conv = TransformerConv(in_channels, self.embed_dim)
+
+                setattr(self, f'conv_{i + 1}', conv)
+
+                if self.use_graph_norm:
+                    graph_norm = GraphNorm(self.embed_dim if i > 0 else self.in_channels)
+                    setattr(self, f'graph_norm_{i + 1}', graph_norm)
+
+        # Optional: Dropout Layer for Convolutional layers
+        if self.use_dropout:
+            self.dropout_layer = nn.Dropout(self.dropout)
+
 
     def forward(self, data):
+
+        if self.use_graph_conv:
+
+            # Unpack data
+            x = data.x
+            edge_index = data.edge_index
+
+            if self.use_pos:
+                pos1 = data.pos[:, 0, :]  # Start position
+                pos2 = data.pos[:, 1, :]  # End position
+                x = torch.cat((x, pos1, pos2), dim=1)  # Concatenate along the feature dimension
+
+            x = x.to(self.dtype)
+
+            for i in range(self.num_graph_conv_layers):
+
+                if self.use_graph_norm:
+                    graph_norm = getattr(self, f'graph_norm_{i + 1}')
+                    x = graph_norm(x)
+
+                conv = getattr(self, f'conv_{i + 1}')
+                x = conv(x, edge_index)
+                x = nn.functional.relu(x)
+                
+                if self.use_dropout:
+                    x = self.dropout_layer(x) 
+
+            data.x = x
+        
         # Unpack data
         if isinstance(data, Batch):
             datalist = data.to_data_list()
@@ -148,32 +187,20 @@ class TransEncoder(BaseGNN):
         x = [data.x for data in datalist]
         x = torch.stack(x)
 
-        if self.use_pos:
-            if self.pos_encoding:
-                # Get node indices for positional embedding
-                node_indices = [data.pos[:,2,:].long().squeeze(-1) for data in datalist]
-                node_indices = torch.stack(node_indices)
-            else:
-                pos = [data.pos[:,2,:] for data in datalist]
-                pos = torch.stack(pos)
-                x = torch.cat((x, pos), dim=2)
+        if self.use_pos and not self.use_graph_conv:
+            pos = [data.pos[:,2,:] for data in datalist]
+            pos = torch.stack(pos)
+            x = torch.cat((x, pos), dim=2)
 
-        x = x.to(self.dtype)
-
-        x = self.embed(x)
+        if not self.use_graph_conv:
+            x = x.to(self.dtype)
+            x = self.embed(x)
         
-        if self.use_pos and self.pos_encoding:
-            pos_emb = self.pos_embedding(node_indices)  # shape: [batch, num_nodes, embed_dim]
+        if self.use_pos_encoding:
+            pos_emb = self.pos_embedding(self.node_indices)  # shape: [num_nodes, embed_dim]
+            pos_emb = pos_emb.unsqueeze(0).expand(x.size(0), -1, -1) # Expand to match batch size
             x = x + pos_emb  # Add positional embedding to embedded features
-
-        # Apply graph convolution to incorporate graph structure
-        if self.use_graph_conv:
-            batch_size, num_nodes, features = x.shape
-            x_reshaped = x.view(-1, features)  # [batch*num_nodes, features]
-            # edge_index should be [2, num_edges]
-            x_reshaped = self.graph_conv(x_reshaped, data.edge_index)  # TODO: add more layers if needed
-            x = x_reshaped.view(batch_size, num_nodes, features)
-
+        
         x = self.transformer(x)
         x = self.output(x)
         
