@@ -117,7 +117,7 @@ class TransEncoder(BaseGNN):
         if self.use_pos_encoding:
             assert self.num_nodes is not None, "num_nodes must be set for positional encoding"
             self.pos_embedding = nn.Embedding(self.num_nodes, self.embed_dim)
-            self.node_indices = torch.arange(self.num_nodes).long()  # Node indices for positional embedding
+            self.node_indices = torch.arange(self.num_nodes).long().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))  # Node indices for positional embedding
 
         # Optional: Graph Convolution Layers
         if self.use_graph_conv:
