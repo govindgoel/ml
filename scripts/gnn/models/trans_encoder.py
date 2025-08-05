@@ -34,7 +34,7 @@ class TransEncoder(BaseGNN):
                 in_channels: int = 5,
                 out_channels: int = 1,
                 embed_dim: int = 128,
-                ff_dim: int = 1024,
+                ff_dim: int = 512,
                 num_heads: int = 4,
                 num_layers: int = 5,
                 num_nodes: int = 31635,
@@ -154,9 +154,8 @@ class TransEncoder(BaseGNN):
             edge_index = data.edge_index
 
             if self.use_pos:
-                pos1 = data.pos[:, 0, :]  # Start position
-                pos2 = data.pos[:, 1, :]  # End position
-                x = torch.cat((x, pos1, pos2), dim=1)  # Concatenate along the feature dimension
+                pos = data.pos[:, 2, :] # Middle position
+                x = torch.cat((x, pos), dim=1)  # Concatenate along the feature dimension
 
             x = x.to(self.dtype)
 
