@@ -26,7 +26,7 @@ from gnn.help_functions import GNN_Loss, compute_baseline_of_mean_target, comput
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # Please adjust as needed
-dataset_path = os.path.join(project_root, 'data', 'train_data', 'dist_10k')
+dataset_path = "/kaggle/input/ml-surrogate-data"
 base_dir = os.path.join(project_root, 'data')
 
 def main():
