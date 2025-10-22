@@ -17,6 +17,7 @@ import torch
 
 my_secret = "f17c238211485718cd88f7b9e692bb9490eb30c4"
 
+import wandb
 wandb.login(key=my_secret)
 
 # Add the 'scripts' directory to Python Path
