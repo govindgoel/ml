@@ -42,7 +42,7 @@ def main():
             batch_file = os.path.join(dataset_path, f'datalist_batch_{batch_num}.pt')
             if not os.path.exists(batch_file):
                 break
-            batch_data = torch.load(batch_file, map_location='cpu')
+            batch_data = torch.load(batch_file, map_location='cpu',weights_only=False)
             if isinstance(batch_data, list):
                 datalist.extend(batch_data)
             batch_num += 1
