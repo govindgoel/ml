@@ -15,6 +15,10 @@ import argparse
 
 import torch
 
+my_secret = "f17c238211485718cd88f7b9e692bb9490eb30c4"
+
+wandb.login(key=my_secret)
+
 # Add the 'scripts' directory to Python Path
 scripts_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if scripts_path not in sys.path:
